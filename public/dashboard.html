@@ -102,6 +102,16 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
     </div>
 
     <div class="card" style="margin-top:12px">
+      <h2>Donantes mensuales</h2>
+      <div class="kpis" style="margin-bottom:12px">
+        <div class="kpi"><div class="l">Activos</div><div class="v" id="s-act">–</div><div class="s" id="s-act-s"></div></div>
+        <div class="kpi"><div class="l">Comprometido por mes</div><div class="v" id="s-mes">–</div><div class="s">suma de suscripciones activas</div></div>
+        <div class="kpi"><div class="l">Cobrado mensual</div><div class="v" id="s-cob">–</div><div class="s">ya incluido en el total</div></div>
+      </div>
+      <div class="scroll"><table id="t-subs"></table></div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
       <h2>Últimas donaciones</h2>
       <div class="scroll"><table id="t-rec"></table></div>
       <div class="note">Neto = lo que queda en la cuenta después de la comisión de Mercado Pago. "Se acredita" = fecha en que Mercado Pago libera el dinero. Las donaciones de cuentas de prueba no suman al total.</div>
@@ -157,6 +167,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
     d.recientes.forEach(function(r){
       var quien = r.nombre ? esc(r.nombre) + "<div class=muted>"+esc(r.email)+"</div>" : esc(r.email || "—");
       if(r.prueba) quien += " <span class=pill>prueba</span>";
+      if(r.tipo === "mensual") quien += " <span class=pill>mensual</span>";
       h += "<tr><td>"+fecha(r.fecha)+"</td><td>"+quien+"</td><td class=n>"+pesos(r.monto)+"</td><td class=n>"+(r.neto==null?"–":pesos(r.neto))+"</td><td>"+dia(r.acreditacion)+"</td><td><span class='pill "+esc(r.estado)+"'>"+esc(ESTADOS[r.estado]||r.estado)+"</span></td><td>"+esc(MEDIOS[r.medio]||r.medio)+"</td><td>"+esc(NOMBRES[r.proyecto]||r.proyecto)+"</td></tr>";
     });
     $("t-rec").innerHTML = d.recientes.length ? h : "<tr><td class=muted>Todavía no hay donaciones.</td></tr>";
@@ -164,6 +175,16 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
     h = "<tr><th>Fecha</th><th>Concepto</th><th class=n>Monto</th><th>Proyecto</th></tr>";
     d.manuales.forEach(function(m){ h += "<tr><td>"+esc(m.fecha)+"</td><td>"+esc(m.concepto)+"</td><td class=n>"+pesos(m.monto)+"</td><td>"+esc(NOMBRES[m.proyecto]||m.proyecto)+"</td></tr>"; });
     $("t-man").innerHTML = d.manuales.length ? h : "<tr><td class=muted>No hay aportes cargados a mano. Las transferencias, efectivo o sponsors se cargan en la pestaña \"Ajustes\" de la planilla y suman al total.</td></tr>";
+
+    var ms = d.mensual || {activos:0, comprometido_mes:0, cobrado:0, bajas:0, pausadas:0};
+    $("s-act").textContent = ms.activos;
+    $("s-act-s").textContent = [ms.pausadas ? ms.pausadas + " pausada(s)" : "", ms.bajas ? ms.bajas + " baja(s)" : ""].filter(Boolean).join(" · ") || "suscripciones vigentes";
+    $("s-mes").textContent = pesos(ms.comprometido_mes);
+    $("s-cob").textContent = pesos(ms.cobrado);
+    var SUBEST = {authorized:"Activa", pending:"Pendiente", paused:"Pausada", cancelled:"Baja", canceled:"Baja"};
+    h = "<tr><th>Alta</th><th>Donante</th><th class=n>Por mes</th><th>Estado</th><th>Proyecto</th></tr>";
+    (d.suscripciones || []).forEach(function(x){ h += "<tr><td>"+fecha(x.alta)+"</td><td>"+esc(x.email||"—")+"</td><td class=n>"+pesos(x.monto)+"</td><td><span class='pill "+(x.estado==="authorized"?"approved":(x.estado==="paused"?"pending":"rejected"))+"'>"+esc(SUBEST[x.estado]||x.estado)+"</span></td><td>"+esc(NOMBRES[x.proyecto]||x.proyecto)+"</td></tr>"; });
+    $("t-subs").innerHTML = (d.suscripciones || []).length ? h : "<tr><td class=muted>Todavía no hay donantes mensuales.</td></tr>";
 
     $("upd").textContent = "Actualizado " + new Date(d.actualizado).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",timeZone:"America/Argentina/Buenos_Aires"});
   }

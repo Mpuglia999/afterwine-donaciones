@@ -18,10 +18,16 @@
 <body>
 <div class="card">
   <div class="icon">❤️</div>
-  <h1>¡Gracias por tu donación!</h1>
+  <h1 id="t">¡Gracias por tu donación!</h1>
   <p>Tu aporte hace posible que sigamos cardioprotegiendo espacios y salvando vidas en toda Argentina.</p>
-  <p style="font-size:14px;color:#999;">Recibirás un comprobante en tu email registrado en Mercado Pago.</p>
+  <p id="s" style="font-size:14px;color:#999;">Recibirás un comprobante en tu email registrado en Mercado Pago.</p>
   <a href="https://afterwine.desfibrilar.org.ar/" class="btn">Volver al After Wine</a>
 </div>
+<script>
+if (/[?&]mensual=1/.test(location.search)) {
+  document.getElementById("t").textContent = "¡Gracias por sumarte todos los meses!";
+  document.getElementById("s").textContent = "Tu aporte mensual quedó activo. Mercado Pago te va a cobrar automáticamente cada mes y podés cancelarlo cuando quieras desde tu cuenta.";
+}
+</script>
 </body>
 </html>
