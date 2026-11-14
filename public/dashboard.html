@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Donaciones · Tablero</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Poppins:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --rojo:#C41C24; --rojo-claro:#F05A61; --negro:#141414; --crema:#FAF7F5; --beige:#F3EBE6;
+  --tinta:#211C1C; --gris:#6B6363; --linea:rgba(33,28,28,.12); --verde:#1F7A4D; --ambar:#A86A00;
+  --display:"Anton","Impact","Arial Narrow Bold",sans-serif; --texto:"Poppins",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--crema);color:var(--tinta);font-family:var(--texto);font-size:14px}
+header{background:var(--negro);color:#fff;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+header h1{font-family:var(--display);font-weight:400;font-size:24px;letter-spacing:.02em;margin:0;text-transform:uppercase}
+header h1 span{color:var(--rojo-claro)}
+header .sp{flex:1}
+header select,header button{font:inherit;font-size:13px;border-radius:8px;border:1px solid rgba(255,255,255,.25);background:transparent;color:#fff;padding:7px 10px;cursor:pointer}
+header select option{color:#000}
+header .upd{font-size:12px;color:rgba(255,255,255,.55)}
+main{max-width:1180px;margin:0 auto;padding:20px 16px 48px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.kpi{background:#fff;border:1px solid var(--linea);border-radius:14px;padding:16px}
+.kpi .l{font-size:12px;color:var(--gris);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.kpi .v{font-family:var(--display);font-size:30px;line-height:1.1;margin-top:6px}
+.kpi .s{font-size:12px;color:var(--gris);margin-top:4px}
+.kpi.main{background:var(--negro);color:#fff;border-color:var(--negro)}
+.kpi.main .l,.kpi.main .s{color:rgba(255,255,255,.6)}
+.kpi.main .v{color:var(--rojo-claro)}
+.meta{background:#fff;border:1px solid var(--linea);border-radius:14px;padding:16px;margin-top:12px}
+.meta .row{display:flex;justify-content:space-between;font-size:13px;color:var(--gris);margin-bottom:8px;gap:8px;flex-wrap:wrap}
+.track{height:12px;background:var(--beige);border-radius:99px;overflow:hidden}
+.fill{height:100%;background:linear-gradient(90deg,var(--rojo),var(--rojo-claro));border-radius:99px;width:0;transition:width 1s}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+@media(max-width:760px){.grid2{grid-template-columns:1fr}}
+.card{background:#fff;border:1px solid var(--linea);border-radius:14px;padding:16px;overflow:hidden}
+.card h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;margin:0 0 12px;color:var(--gris)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-weight:600;color:var(--gris);font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding:8px 6px;border-bottom:1px solid var(--linea)}
+td{padding:9px 6px;border-bottom:1px solid var(--linea);vertical-align:top}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.scroll{overflow-x:auto}
+.pill{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;background:var(--beige)}
+.pill.approved{background:#E3F2EA;color:var(--verde)}
+.pill.pending,.pill.in_process{background:#FFF1D6;color:var(--ambar)}
+.pill.rejected,.pill.cancelled,.pill.refunded{background:#FBE3E4;color:var(--rojo)}
+.muted{color:var(--gris);font-size:12px}
+.note{font-size:12px;color:var(--gris);margin-top:10px}
+#login{max-width:360px;margin:12vh auto;background:#fff;border:1px solid var(--linea);border-radius:16px;padding:28px;text-align:center}
+#login h2{font-family:var(--display);font-weight:400;font-size:28px;margin:0 0 6px;text-transform:uppercase}
+#login input{width:100%;font:inherit;font-size:18px;text-align:center;padding:12px;border:2px solid var(--linea);border-radius:10px;margin:16px 0 10px;letter-spacing:.15em}
+#login button{width:100%;font:inherit;font-weight:700;padding:12px;border:0;border-radius:10px;background:var(--rojo);color:#fff;cursor:pointer}
+#err{color:var(--rojo);font-size:13px;min-height:18px}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <h2>Tablero de donaciones</h2>
+  <div class="muted">Fundación Desfibrilar · ingresá el PIN del equipo</div>
+  <form id="f"><input id="pin" type="password" inputmode="text" autocomplete="current-password" aria-label="PIN"><button>Entrar</button></form>
+  <div id="err"></div>
+</div>
+
+<div id="app" class="hide">
+  <header>
+    <h1>Donaciones <span>After Wine</span></h1>
+    <div class="sp"></div>
+    <select id="proj" aria-label="Proyecto">
+      <option value="afterwine">After Wine 2026</option>
+      <option value="pulsoweek">Pulso Week 2027</option>
+      <option value="latidos">Latidos</option>
+      <option value="">Todos los proyectos</option>
+    </select>
+    <button id="pantalla" title="Pantalla para proyectar, sin datos personales">Modo pantalla</button>
+    <span class="upd" id="upd"></span>
+  </header>
+  <main>
+    <div class="kpis">
+      <div class="kpi main"><div class="l">Total recaudado</div><div class="v" id="k-total">–</div><div class="s" id="k-total-s"></div></div>
+      <div class="kpi"><div class="l">Neto acreditado</div><div class="v" id="k-neto">–</div><div class="s" id="k-neto-s"></div></div>
+      <div class="kpi"><div class="l">Comisión Mercado Pago</div><div class="v" id="k-com">–</div><div class="s" id="k-com-s"></div></div>
+      <div class="kpi"><div class="l">Donaciones</div><div class="v" id="k-cant">–</div><div class="s" id="k-cant-s"></div></div>
+      <div class="kpi"><div class="l">Promedio</div><div class="v" id="k-prom">–</div><div class="s">por donación online</div></div>
+    </div>
+
+    <div class="meta">
+      <div class="row"><span id="m-txt"></span><span>Meta $3.500.000</span></div>
+      <div class="track"><div class="fill" id="m-fill"></div></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card"><h2>Por proyecto</h2><div class="scroll"><table id="t-proj"></table></div></div>
+      <div class="card"><h2>Por medio de pago</h2><div class="scroll"><table id="t-medio"></table></div>
+        <div class="note" id="manual-note"></div></div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <h2>Últimas donaciones</h2>
+      <div class="scroll"><table id="t-rec"></table></div>
+      <div class="note">Neto = lo que queda en la cuenta después de la comisión de Mercado Pago. "Se acredita" = fecha en que Mercado Pago libera el dinero. Las donaciones de cuentas de prueba no suman al total.</div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <h2>Aportes cargados a mano (pestaña "Ajustes" de la planilla)</h2>
+      <div class="scroll"><table id="t-man"></table></div>
+    </div>
+  </main>
+</div>
+
+<script>
+(function(){
+  var META = 3500000, KEY = "", timer = null;
+  var MEDIOS = {credit_card:"Tarjeta de crédito", debit_card:"Tarjeta de débito", account_money:"Dinero en cuenta MP", ticket:"Efectivo (Rapipago/Pago Fácil)", bank_transfer:"Transferencia", prepaid_card:"Tarjeta prepaga", digital_currency:"Mercado Crédito", otro:"Otro"};
+  var ESTADOS = {approved:"Aprobada", pending:"Pendiente", in_process:"En proceso", rejected:"Rechazada", cancelled:"Cancelada", refunded:"Devuelta", charged_back:"Contracargo", authorized:"Autorizada"};
+  var NOMBRES = {afterwine:"After Wine 2026", pulsoweek:"Pulso Week 2027", latidos:"Latidos"};
+  function $(id){ return document.getElementById(id); }
+  function pesos(n){ return "$" + Math.round(n||0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, "."); }
+  function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+  function fecha(s){ if(!s) return ""; var d = new Date(s); if(isNaN(d)) return esc(s); return d.toLocaleString("es-AR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",timeZone:"America/Argentina/Buenos_Aires"}); }
+  function dia(s){ if(!s) return "–"; var p = String(s).slice(0,10).split("-"); return p.length===3 ? p[2]+"/"+p[1] : esc(s); }
+  function store(k,v){ try{ if(v===undefined) return localStorage.getItem(k); if(v===null) localStorage.removeItem(k); else localStorage.setItem(k,v);}catch(e){} return null; }
+
+  function render(d){
+    var t = d.totales;
+    $("k-total").textContent = pesos(t.total);
+    $("k-total-s").textContent = t.manual ? pesos(t.bruto) + " online + " + pesos(t.manual) + " a mano" : "todo online";
+    $("k-neto").textContent = pesos(t.neto);
+    $("k-neto-s").textContent = t.sin_neto ? t.sin_neto + " donación(es) sin dato de neto todavía" : "de " + pesos(t.bruto) + " online";
+    $("k-com").textContent = pesos(t.comision);
+    $("k-com-s").textContent = t.bruto && !t.sin_neto ? (t.comision / t.bruto * 100).toFixed(1).replace(".",",") + "% del online" : "";
+    $("k-cant").textContent = t.cantidad;
+    $("k-cant-s").textContent = [t.pendientes ? t.pendientes + " pendiente(s)" : "", t.rechazadas ? t.rechazadas + " rechazada(s)" : ""].filter(Boolean).join(" · ") || "aprobadas";
+    $("k-prom").textContent = pesos(t.promedio);
+    var pct = Math.min(t.total / META * 100, 100);
+    $("m-fill").style.width = pct.toFixed(1) + "%";
+    $("m-txt").textContent = pct.toFixed(1).replace(".",",") + "% de la meta · faltan " + pesos(Math.max(META - t.total, 0));
+
+    var h = "<tr><th>Proyecto</th><th class=n>Online</th><th class=n>Neto</th><th class=n>A mano</th><th class=n>Cant.</th></tr>";
+    Object.keys(d.por_proyecto).forEach(function(k){ var p = d.por_proyecto[k];
+      h += "<tr><td>"+esc(NOMBRES[k]||k)+"</td><td class=n>"+pesos(p.bruto)+"</td><td class=n>"+pesos(p.neto)+"</td><td class=n>"+pesos(p.manual)+"</td><td class=n>"+p.cantidad+"</td></tr>"; });
+    $("t-proj").innerHTML = Object.keys(d.por_proyecto).length ? h : "<tr><td class=muted>Todavía no hay donaciones.</td></tr>";
+
+    h = "<tr><th>Medio</th><th class=n>Monto</th><th class=n>Cant.</th></tr>";
+    Object.keys(d.por_medio).forEach(function(k){ var m = d.por_medio[k];
+      h += "<tr><td>"+esc(MEDIOS[k]||k)+"</td><td class=n>"+pesos(m.bruto)+"</td><td class=n>"+m.cantidad+"</td></tr>"; });
+    $("t-medio").innerHTML = Object.keys(d.por_medio).length ? h : "<tr><td class=muted>Sin datos.</td></tr>";
+    $("manual-note").textContent = t.pruebas ? t.pruebas + " pago(s) de prueba no se cuentan." : "";
+
+    h = "<tr><th>Fecha</th><th>Donante</th><th class=n>Monto</th><th class=n>Neto</th><th>Se acredita</th><th>Estado</th><th>Medio</th><th>Proyecto</th></tr>";
+    d.recientes.forEach(function(r){
+      var quien = r.nombre ? esc(r.nombre) + "<div class=muted>"+esc(r.email)+"</div>" : esc(r.email || "—");
+      if(r.prueba) quien += " <span class=pill>prueba</span>";
+      h += "<tr><td>"+fecha(r.fecha)+"</td><td>"+quien+"</td><td class=n>"+pesos(r.monto)+"</td><td class=n>"+(r.neto==null?"–":pesos(r.neto))+"</td><td>"+dia(r.acreditacion)+"</td><td><span class='pill "+esc(r.estado)+"'>"+esc(ESTADOS[r.estado]||r.estado)+"</span></td><td>"+esc(MEDIOS[r.medio]||r.medio)+"</td><td>"+esc(NOMBRES[r.proyecto]||r.proyecto)+"</td></tr>";
+    });
+    $("t-rec").innerHTML = d.recientes.length ? h : "<tr><td class=muted>Todavía no hay donaciones.</td></tr>";
+
+    h = "<tr><th>Fecha</th><th>Concepto</th><th class=n>Monto</th><th>Proyecto</th></tr>";
+    d.manuales.forEach(function(m){ h += "<tr><td>"+esc(m.fecha)+"</td><td>"+esc(m.concepto)+"</td><td class=n>"+pesos(m.monto)+"</td><td>"+esc(NOMBRES[m.proyecto]||m.proyecto)+"</td></tr>"; });
+    $("t-man").innerHTML = d.manuales.length ? h : "<tr><td class=muted>No hay aportes cargados a mano. Las transferencias, efectivo o sponsors se cargan en la pestaña \"Ajustes\" de la planilla y suman al total.</td></tr>";
+
+    $("upd").textContent = "Actualizado " + new Date(d.actualizado).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",timeZone:"America/Argentina/Buenos_Aires"});
+  }
+
+  function cargar(){
+    var p = $("proj").value;
+    return fetch("/api/dashboard" + (p ? "?project=" + encodeURIComponent(p) : ""), {headers:{"x-dashboard-key":KEY}, cache:"no-store"})
+      .then(function(r){ if(r.status===401) throw new Error("PIN incorrecto"); return r.json(); })
+      .then(function(d){ if(d.error) throw new Error(d.error); render(d); return true; });
+  }
+
+  function entrar(k){
+    KEY = k; $("err").textContent = "";
+    cargar().then(function(){
+      store("dsf_dash_key", k);
+      $("login").classList.add("hide"); $("app").classList.remove("hide");
+      clearInterval(timer); timer = setInterval(function(){ cargar().catch(function(){}); }, 30000);
+    }).catch(function(e){ store("dsf_dash_key", null); $("login").classList.remove("hide"); $("app").classList.add("hide"); $("err").textContent = e.message; });
+  }
+
+  $("f").addEventListener("submit", function(e){ e.preventDefault(); entrar($("pin").value.trim()); });
+  $("proj").addEventListener("change", function(){ cargar().catch(function(){}); });
+  $("pantalla").addEventListener("click", function(){ window.open("/pantalla?project=" + encodeURIComponent($("proj").value || "afterwine"), "_blank"); });
+  var saved = store("dsf_dash_key"); if(saved) entrar(saved);
+})();
+</script>
+</body>
+</html>

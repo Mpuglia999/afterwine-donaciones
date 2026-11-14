@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>After Wine · Recaudación en vivo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Poppins:wght@400;600&display=swap">
+<style>
+:root{--rojo:#C41C24;--rojo-claro:#F05A61;--negro:#141414;--display:"Anton","Impact",sans-serif;--texto:"Poppins",system-ui,sans-serif}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:radial-gradient(ellipse at 50% 120%,#3a0e11 0%,var(--negro) 60%);color:#fff;font-family:var(--texto);display:flex;align-items:center;justify-content:center;text-align:center;overflow:hidden;padding:4vh 5vw}
+.wrap{width:100%;max-width:1400px}
+.tag{font-size:clamp(14px,1.8vw,24px);letter-spacing:.3em;text-transform:uppercase;color:rgba(255,255,255,.6);font-weight:600}
+.total{font-family:var(--display);font-size:clamp(64px,14vw,220px);line-height:1;margin:2vh 0 1vh;color:#fff;transition:color .6s}
+.total.flash{color:var(--rojo-claro)}
+.sub{font-size:clamp(16px,2.2vw,30px);color:rgba(255,255,255,.75)}
+.track{height:clamp(14px,2vh,26px);background:rgba(255,255,255,.12);border-radius:99px;overflow:hidden;margin:5vh auto 2vh;max-width:1100px}
+.fill{height:100%;width:0;background:linear-gradient(90deg,var(--rojo),var(--rojo-claro));border-radius:99px;transition:width 1.6s cubic-bezier(.22,1,.36,1)}
+.metas{display:flex;justify-content:space-between;max-width:1100px;margin:0 auto;font-size:clamp(13px,1.6vw,22px);color:rgba(255,255,255,.6)}
+.lema{margin-top:6vh;font-family:var(--display);font-size:clamp(18px,2.6vw,38px);text-transform:uppercase;letter-spacing:.03em}
+.lema span{color:var(--rojo-claro)}
+.qr{margin-top:2vh;font-size:clamp(13px,1.5vw,20px);color:rgba(255,255,255,.55)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="tag">After Wine 2026 · Recaudación en vivo</div>
+  <div class="total" id="total">$0</div>
+  <div class="sub" id="sub">&nbsp;</div>
+  <div class="track"><div class="fill" id="fill"></div></div>
+  <div class="metas"><span id="pct">0%</span><span>Meta $3.500.000</span></div>
+  <div class="lema">El corazón de la ciudad <span>somos todos</span></div>
+  <div class="qr">Aportá en afterwine.desfibrilar.org.ar</div>
+</div>
+<script>
+(function(){
+  var META = 3500000, ultimo = null;
+  var q = new URLSearchParams(location.search), proj = q.get("project") || "afterwine";
+  function pesos(n){ return "$" + Math.round(n||0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, "."); }
+  var el = document.getElementById("total");
+  function animar(desde, hasta){
+    var t0 = performance.now(), dur = 1500;
+    function step(t){ var k = Math.min((t - t0) / dur, 1), e = 1 - Math.pow(1 - k, 3);
+      el.textContent = pesos(desde + (hasta - desde) * e); if(k < 1) requestAnimationFrame(step); }
+    requestAnimationFrame(step);
+  }
+  function cargar(){
+    fetch("/api/totals?project=" + encodeURIComponent(proj), {cache:"no-store"})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if(typeof d.total !== "number") return;
+        if(ultimo === null || d.total !== ultimo){
+          animar(ultimo || 0, d.total);
+          if(ultimo !== null){ el.classList.add("flash"); setTimeout(function(){ el.classList.remove("flash"); }, 2500); }
+          ultimo = d.total;
+        }
+        var pct = Math.min(d.total / META * 100, 100);
+        document.getElementById("fill").style.width = pct.toFixed(1) + "%";
+        document.getElementById("pct").textContent = pct.toFixed(1).replace(".", ",") + "% de la meta";
+        document.getElementById("sub").textContent = d.count === 1 ? "1 donación online" : d.count + " donaciones online";
+      }).catch(function(){});
+  }
+  cargar(); setInterval(cargar, 20000);
+})();
+</script>
+</body>
+</html>
