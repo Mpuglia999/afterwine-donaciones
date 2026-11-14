@@ -35,6 +35,26 @@ export async function readRange(range) {
   return (await resp.json()).values || [];
 }
 
+// Writes: append one row to a tab, or overwrite row N (1-based) from column A.
+export async function appendRow(tab, row) {
+  const token = await getGoogleToken("https://www.googleapis.com/auth/spreadsheets");
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${process.env.GOOGLE_SHEET_ID}/values/${encodeURIComponent(tab + "!A1")}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+  const r = await fetch(url, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ values: [row] }) });
+  if (!r.ok) throw new Error(`Sheets append error ${r.status}: ${await r.text()}`);
+}
+export async function updateRow(tab, rowNumber, row) {
+  const token = await getGoogleToken("https://www.googleapis.com/auth/spreadsheets");
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${process.env.GOOGLE_SHEET_ID}/values/${encodeURIComponent(tab + "!A" + rowNumber)}?valueInputOption=USER_ENTERED`;
+  const r = await fetch(url, { method: "PUT", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ values: [row] }) });
+  if (!r.ok) throw new Error(`Sheets update error ${r.status}: ${await r.text()}`);
+}
+
+// Monthly donation catalog (fixed amounts per project). Plans are created once via /api/admin-planes.
+export const PLANES_MENSUALES = {
+  afterwine: { nombre: "After Wine 2026", montos: [5000, 10000, 20000] },
+  pulsoweek: { nombre: "Pulso Week 2027", montos: [5000, 10000, 20000] },
+};
+
 export function toNumber(v) {
   if (typeof v === "number") return v;
   if (v == null || v === "") return 0;
@@ -50,7 +70,7 @@ export function toNumber(v) {
 // Columns Hoja 1: 0 timestamp, 1 payment_id, 2 amount, 3 status, 4 email, 5 name,
 // 6 project, 7 payment_type, 8 status_detail, 9 net, 10 fee, 11 release_date
 export async function loadData() {
-  const [rows, ajustes] = await Promise.all([readRange("Hoja 1!A2:L"), readRange("Ajustes!A2:D")]);
+  const [rows, ajustes, subs] = await Promise.all([readRange("Hoja 1!A2:N"), readRange("Ajustes!A2:D"), readRange("Suscripciones!A2:H")]);
   const latest = new Map();
   rows.forEach((r, i) => latest.set(r[1] ? String(r[1]) : `row_${i}`, r));
   const donations = [...latest.values()].map((r) => {
@@ -71,10 +91,16 @@ export async function loadData() {
       comision: r[10] === undefined || r[10] === "" ? null : toNumber(r[10]),
       acreditacion: r[11] || "",
       prueba: /@testuser\.com$/i.test(email),
+      tipo: r[12] || "unica",
+      suscripcion: r[13] ? String(r[13]) : "",
     };
   });
+  const suscripciones = subs.filter((r) => r[0]).map((r) => ({
+    id: String(r[0]), alta: r[1] || "", email: r[2] || "", monto: toNumber(r[3]),
+    estado: (r[4] || "").toLowerCase(), proyecto: r[5] || "afterwine", plan: r[6] || "", actualizado: r[7] || "",
+  }));
   const manuales = ajustes
     .filter((r) => toNumber(r[2]) !== 0)
     .map((r) => ({ fecha: r[0] || "", concepto: r[1] || "", monto: toNumber(r[2]), proyecto: r[3] || "afterwine" }));
-  return { donations, manuales };
+  return { donations, manuales, suscripciones };
 }
