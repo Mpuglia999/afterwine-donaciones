@@ -25,7 +25,7 @@
     project: container.getAttribute("data-project") || "afterwine",
     color: container.getAttribute("data-color") || "#c41c24",
     amounts: container.getAttribute("data-amounts"),
-    monthlyAmounts: container.getAttribute("data-monthly-amounts") || "5000,10000,20000",
+    monthlyAmounts: container.getAttribute("data-monthly-amounts") || "5000,10000,20000,50000",
     monthly: container.getAttribute("data-monthly") !== "false",
     title: container.getAttribute("data-title"),
     lang: container.getAttribute("data-lang") || "es",
