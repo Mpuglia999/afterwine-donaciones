@@ -60,8 +60,8 @@ export async function updateRow(tab, rowNumber, row) {
 
 // Monthly donation catalog (fixed amounts per project). Plans are created once via /api/admin-planes.
 export const PLANES_MENSUALES = {
-  afterwine: { nombre: "After Wine 2026", montos: [5000, 10000, 20000] },
-  pulsoweek: { nombre: "Pulso Week 2027", montos: [5000, 10000, 20000] },
+  afterwine: { nombre: "After Wine 2026", montos: [5000, 10000, 20000, 50000] },
+  pulsoweek: { nombre: "Pulso Week 2027", montos: [5000, 10000, 20000, 50000] },
 };
 
 export function toNumber(v) {

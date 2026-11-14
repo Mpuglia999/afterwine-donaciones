@@ -127,9 +127,23 @@ async function procesarPago(paymentId, preapprovalId) {
     }
   }
 
+  if (subId && row[4]) await completarEmailSuscripcion(subId, row[4]).catch(() => {});
+
   const prevStatus = prev ? String(prev[3] || "").toLowerCase() : null;
   if (row[3] === "approved" && prevStatus !== "approved" && !/@testuser\.com$/i.test(row[4])) {
     await avisarChat(row).catch((e) => console.error("[webhook] Chat error:", e.message));
+  }
+}
+
+// Mercado Pago often omits payer_email on plan subscriptions: take it from the charge.
+async function completarEmailSuscripcion(subId, email) {
+  const subs = await readRange("Suscripciones!A1:H");
+  for (let i = 1; i < subs.length; i++) {
+    const r = subs[i];
+    if (r && String(r[0]) === String(subId)) {
+      if (!r[2]) { const nr = r.slice(0, 8); while (nr.length < 8) nr.push(""); nr[2] = email; await updateRow("Suscripciones", i + 1, nr); }
+      return;
+    }
   }
 }
 
@@ -139,10 +153,16 @@ async function procesarSuscripcion(subId) {
   const project = (await proyectoDePlan(pre.preapproval_plan_id)) || "afterwine";
   const ar = pre.auto_recurring || {};
   const estado = String(pre.status || "").toLowerCase();
+  let email = pre.payer_email || "";
+  if (!email) {
+    const pagos = await readRange("Hoja 1!E1:N");
+    const pg = pagos.find((r) => r && String(r[9]) === String(pre.id) && r[0]);
+    if (pg) email = pg[0];
+  }
   const row = [
     String(pre.id),
     pre.date_created ? new Date(pre.date_created).toISOString() : new Date().toISOString(),
-    pre.payer_email || "",
+    email,
     ar.transaction_amount || 0,
     estado,
     project,
@@ -166,8 +186,8 @@ async function procesarSuscripcion(subId) {
 
   if (estado !== prevEstado) {
     let msg = null;
-    if (estado === "authorized") msg = `🔁 *Nuevo donante mensual ${NOMBRES[project] || project}: ${pesos(row[3])}/mes*\nDe: ${row[2] || "sin datos"}`;
-    else if (estado === "cancelled" || estado === "canceled") msg = `⚠️ Baja de donante mensual ${NOMBRES[project] || project} (${pesos(row[3])}/mes)\nDe: ${row[2] || "sin datos"}`;
+    // Alta: no message here; the first approved charge announces the new monthly donor (one message).
+    if (estado === "cancelled" || estado === "canceled") msg = `⚠️ Baja de donante mensual ${NOMBRES[project] || project} (${pesos(row[3])}/mes)\nDe: ${row[2] || "sin datos"}`;
     else if (estado === "paused") msg = `⏸️ Donación mensual pausada (${pesos(row[3])}/mes) — ${row[2] || "sin datos"}`;
     if (msg) await enviarChat(msg + "\nTablero: https://afterwine-donaciones.vercel.app/dashboard").catch((e) => console.error("[webhook] Chat error:", e.message));
   }
@@ -190,8 +210,19 @@ async function avisarChat(row) {
     total = donations.filter((d) => d.estado === "approved" && !d.prueba && d.proyecto === proyecto).reduce((s, d) => s + d.monto, 0)
       + manuales.filter((m) => m.proyecto === proyecto).reduce((s, m) => s + m.monto, 0);
   } catch (e) {}
+  let titulo = `💛 *Nueva donación ${NOMBRES[proyecto] || proyecto}: ${pesos(row[2])}*`;
+  if (row[12] === "mensual") {
+    let cobros = 1;
+    try {
+      const pagos = await readRange("Hoja 1!B1:N");
+      cobros = pagos.filter((r) => r && r[12] === row[13] && String(r[2]).toLowerCase() === "approved").length || 1;
+    } catch (e) {}
+    titulo = cobros <= 1
+      ? `🔁 *Nuevo donante mensual ${NOMBRES[proyecto] || proyecto}: ${pesos(row[2])}/mes* (primer cobro acreditado)`
+      : `🔁 *Cobro mensual ${NOMBRES[proyecto] || proyecto}: ${pesos(row[2])}* (cobro n.º ${cobros})`;
+  }
   const lineas = [
-    `💛 *Nueva donación ${row[12] === "mensual" ? "mensual " : ""}${NOMBRES[proyecto] || proyecto}: ${pesos(row[2])}*`,
+    titulo,
     `De: ${row[5] || row[4] || "sin datos"}`,
     row[9] !== "" ? `Neto acreditado: ${pesos(row[9])}` : null,
     total != null ? `Total recaudado: ${pesos(total)}` : null,
