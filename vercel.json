@@ -5,10 +5,22 @@
       "src": "/api/(.*)",
       "headers": {
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, x-dashboard-key"
       },
       "continue": true
-    }
+    },
+    {
+      "src": "/widget\\.js",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=60"
+      },
+      "continue": true
+    },
+    { "src": "^/(index\\.html)?$", "dest": "/api/landing" },
+    { "src": "^/(gracias|error|pendiente|dashboard|pantalla|widget-demo)/?$", "dest": "/$1.html" },
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/api/landing" }
   ]
 }
