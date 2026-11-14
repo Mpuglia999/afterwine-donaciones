@@ -3,6 +3,7 @@
 // - subscription_preapproval: one row per subscription in "Suscripciones" (alta / pausa / baja)
 // - subscription_authorized_payment: monthly charge → its payment is recorded as tipo "mensual"
 import { loadData, readRange, appendRow, updateRow, clearRow } from "./_google.js";
+import { mailAgradecimiento, enviarMail } from "./_mail.js";
 
 const MP = "https://api.mercadopago.com";
 const NOMBRES = { afterwine: "After Wine 2026", pulsoweek: "Pulso Week 2027", latidos: "Latidos" };
@@ -132,7 +133,22 @@ async function procesarPago(paymentId, preapprovalId) {
   const prevStatus = prev ? String(prev[3] || "").toLowerCase() : null;
   if (row[3] === "approved" && prevStatus !== "approved" && !/@testuser\.com$/i.test(row[4])) {
     await avisarChat(row).catch((e) => console.error("[webhook] Chat error:", e.message));
+    await agradecer(row).catch((e) => console.error("[webhook] Mail error:", e.message));
   }
+}
+
+// Thank-you email: one-time donations always; monthly only on the first charge.
+async function agradecer(row) {
+  if (!process.env.MAIL_WEBHOOK_URL || !row[4]) return;
+  const mensual = row[12] === "mensual";
+  if (mensual) {
+    const pagos = await readRange("Hoja 1!B1:N");
+    const cobros = pagos.filter((r) => r && r[12] === row[13] && String(r[2]).toLowerCase() === "approved").length;
+    if (cobros > 1) return;
+  }
+  const msg = mailAgradecimiento({ email: row[4], nombre: row[5], monto: row[2], proyecto: row[6], mensual, fecha: row[0], operacion: row[1] });
+  await enviarMail(msg);
+  console.log("[webhook] Mail de agradecimiento enviado a", row[4]);
 }
 
 // Mercado Pago often omits payer_email on plan subscriptions: take it from the charge.
