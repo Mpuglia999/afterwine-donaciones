@@ -1,6 +1,6 @@
 // POST /api/webhook — Mercado Pago notifications → Google Sheets ("Hoja 1")
 // One row per payment_id: a repeated notification updates the existing row (status, net, release date).
-import { getGoogleToken } from "./_google.js";
+import { getGoogleToken, loadData } from "./_google.js";
 
 const SHEETS = "https://sheets.googleapis.com/v4/spreadsheets/";
 
@@ -52,7 +52,13 @@ export default async function handler(req, res) {
     ];
 
     if (process.env.GOOGLE_SHEET_ID && process.env.GOOGLE_SA_EMAIL && process.env.GOOGLE_SA_KEY) {
-      console.log("[webhook] Google Sheets:", await upsertRow(row));
+      const result = await upsertRow(row);
+      console.log("[webhook] Google Sheets:", result.action);
+      // Aviso a Google Chat la primera vez que el pago queda aprobado
+      const esPrueba = /@testuser\.com$/i.test(row[4]);
+      if (row[3] === "approved" && result.prevStatus !== "approved" && !esPrueba) {
+        await avisarChat(row).catch((e) => console.error("[webhook] Chat error:", e.message));
+      }
     }
     return res.status(200).json({ status: "ok", payment_id: p.id });
   } catch (err) {
@@ -66,12 +72,12 @@ async function upsertRow(row) {
   const base = SHEETS + process.env.GOOGLE_SHEET_ID + "/values/";
   const auth = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
-  const r = await fetch(base + encodeURIComponent("Hoja 1!B:B"), { headers: auth });
+  const r = await fetch(base + encodeURIComponent("Hoja 1!B:D"), { headers: auth });
   if (!r.ok) throw new Error(`Sheets read error ${r.status}: ${await r.text()}`);
   const ids = (await r.json()).values || [];
-  let rowIndex = -1;
+  let rowIndex = -1, prevStatus = null;
   for (let i = 1; i < ids.length; i++) {
-    if (ids[i] && String(ids[i][0]) === row[1]) { rowIndex = i + 1; break; }
+    if (ids[i] && String(ids[i][0]) === row[1]) { rowIndex = i + 1; prevStatus = (ids[i][2] || "").toLowerCase(); break; }
   }
 
   const url = rowIndex > 0
@@ -79,5 +85,31 @@ async function upsertRow(row) {
     : base + encodeURIComponent("Hoja 1!A:L") + ":append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS";
   const w = await fetch(url, { method: rowIndex > 0 ? "PUT" : "POST", headers: auth, body: JSON.stringify({ values: [row] }) });
   if (!w.ok) throw new Error(`Sheets write error ${w.status}: ${await w.text()}`);
-  return rowIndex > 0 ? `updated row ${rowIndex}` : "appended";
+  return { action: rowIndex > 0 ? `updated row ${rowIndex}` : "appended", prevStatus };
+}
+
+const NOMBRES = { afterwine: "After Wine 2026", pulsoweek: "Pulso Week 2027", latidos: "Latidos" };
+const pesos = (n) => "$" + Math.round(Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+
+// Posts to the Google Chat incoming webhook in CHAT_WEBHOOK_URL (if set).
+async function avisarChat(row) {
+  const hook = process.env.CHAT_WEBHOOK_URL;
+  if (!hook) return;
+  const proyecto = row[6];
+  let total = null;
+  try {
+    const { donations, manuales } = await loadData();
+    total = donations.filter((d) => d.estado === "approved" && !d.prueba && d.proyecto === proyecto).reduce((s, d) => s + d.monto, 0)
+      + manuales.filter((m) => m.proyecto === proyecto).reduce((s, m) => s + m.monto, 0);
+  } catch (e) {}
+  const quien = row[5] || row[4] || "sin datos";
+  const lineas = [
+    `💛 *Nueva donación ${NOMBRES[proyecto] || proyecto}: ${pesos(row[2])}*`,
+    `De: ${quien}`,
+    row[9] !== "" ? `Neto acreditado: ${pesos(row[9])}` : null,
+    total != null ? `Total recaudado: ${pesos(total)}` : null,
+    "Tablero: https://afterwine-donaciones.vercel.app/dashboard",
+  ].filter(Boolean);
+  const r = await fetch(hook, { method: "POST", headers: { "Content-Type": "application/json; charset=UTF-8" }, body: JSON.stringify({ text: lineas.join("\n") }) });
+  if (!r.ok) throw new Error(`Chat ${r.status}: ${await r.text()}`);
 }
