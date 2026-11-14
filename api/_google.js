@@ -41,6 +41,15 @@ export async function appendRow(tab, row) {
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${process.env.GOOGLE_SHEET_ID}/values/${encodeURIComponent(tab + "!A1")}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
   const r = await fetch(url, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ values: [row] }) });
   if (!r.ok) throw new Error(`Sheets append error ${r.status}: ${await r.text()}`);
+  const d = await r.json().catch(() => ({}));
+  const m = String((d.updates && d.updates.updatedRange) || "").match(/![A-Z]+(\d+)/);
+  return m ? Number(m[1]) : null; // row number where it landed
+}
+export async function clearRow(tab, rowNumber) {
+  const token = await getGoogleToken("https://www.googleapis.com/auth/spreadsheets");
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${process.env.GOOGLE_SHEET_ID}/values/${encodeURIComponent(tab + "!A" + rowNumber + ":Z" + rowNumber)}:clear`;
+  const r = await fetch(url, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+  if (!r.ok) throw new Error(`Sheets clear error ${r.status}: ${await r.text()}`);
 }
 export async function updateRow(tab, rowNumber, row) {
   const token = await getGoogleToken("https://www.googleapis.com/auth/spreadsheets");
@@ -72,7 +81,7 @@ export function toNumber(v) {
 export async function loadData() {
   const [rows, ajustes, subs] = await Promise.all([readRange("Hoja 1!A2:N"), readRange("Ajustes!A2:D"), readRange("Suscripciones!A2:H")]);
   const latest = new Map();
-  rows.forEach((r, i) => latest.set(r[1] ? String(r[1]) : `row_${i}`, r));
+  rows.forEach((r) => { if (r && r[1]) latest.set(String(r[1]), r); });
   const donations = [...latest.values()].map((r) => {
     const email = r[4] || "";
     const amount = toNumber(r[2]);

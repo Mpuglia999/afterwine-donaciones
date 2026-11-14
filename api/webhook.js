@@ -2,7 +2,7 @@
 // - payment: one row per payment_id in "Hoja 1" (repeated notifications update the same row)
 // - subscription_preapproval: one row per subscription in "Suscripciones" (alta / pausa / baja)
 // - subscription_authorized_payment: monthly charge → its payment is recorded as tipo "mensual"
-import { loadData, readRange, appendRow, updateRow } from "./_google.js";
+import { loadData, readRange, appendRow, updateRow, clearRow } from "./_google.js";
 
 const MP = "https://api.mercadopago.com";
 const NOMBRES = { afterwine: "After Wine 2026", pulsoweek: "Pulso Week 2027", latidos: "Latidos" };
@@ -111,8 +111,21 @@ async function procesarPago(paymentId, preapprovalId) {
   }
   // A later plain "payment" notification must not erase the subscription link found earlier
   if (prev && !subId && prev[13]) { row[6] = prev[6]; row[12] = prev[12]; row[13] = prev[13]; }
-  if (rowNumber > 0) await updateRow("Hoja 1", rowNumber, row);
-  else await appendRow("Hoja 1", row);
+  if (rowNumber > 0) {
+    await updateRow("Hoja 1", rowNumber, row);
+  } else {
+    // MP often sends 2 notifications for the same payment at the same instant; both may append.
+    // After appending, keep only the first row for this payment and clear ours if it is a duplicate.
+    const mine = await appendRow("Hoja 1", row);
+    const ids = await readRange("Hoja 1!B1:B");
+    const filas = [];
+    ids.forEach((r, i) => { if (i > 0 && r && String(r[0]) === row[1]) filas.push(i + 1); });
+    if (mine && filas.length > 1 && filas[0] !== mine) {
+      await clearRow("Hoja 1", mine);
+      console.log("[webhook] Duplicate row", mine, "cleared; kept", filas[0]);
+      return; // the other invocation owns this payment (and its Chat alert)
+    }
+  }
 
   const prevStatus = prev ? String(prev[3] || "").toLowerCase() : null;
   if (row[3] === "approved" && prevStatus !== "approved" && !/@testuser\.com$/i.test(row[4])) {
@@ -141,8 +154,15 @@ async function procesarSuscripcion(subId) {
   for (let i = 1; i < subs.length; i++) {
     if (subs[i] && String(subs[i][0]) === row[0]) { rowNumber = i + 1; prevEstado = String(subs[i][4] || "").toLowerCase(); break; }
   }
-  if (rowNumber > 0) await updateRow("Suscripciones", rowNumber, row);
-  else await appendRow("Suscripciones", row);
+  if (rowNumber > 0) {
+    await updateRow("Suscripciones", rowNumber, row);
+  } else {
+    const mine = await appendRow("Suscripciones", row);
+    const ids = await readRange("Suscripciones!A1:A");
+    const filas = [];
+    ids.forEach((r, i) => { if (i > 0 && r && String(r[0]) === row[0]) filas.push(i + 1); });
+    if (mine && filas.length > 1 && filas[0] !== mine) { await clearRow("Suscripciones", mine); return; }
+  }
 
   if (estado !== prevEstado) {
     let msg = null;
