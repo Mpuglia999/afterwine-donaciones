@@ -139,7 +139,7 @@ async function procesarPago(paymentId, preapprovalId) {
 
 // Thank-you email: one-time donations always; monthly only on the first charge.
 async function agradecer(row) {
-  if (!process.env.MAIL_WEBHOOK_URL || !row[4]) return;
+  if (!row[4] || /@testuser\.com$/i.test(row[4])) return;
   const mensual = row[12] === "mensual";
   if (mensual) {
     const pagos = await readRange("Hoja 1!B1:N");

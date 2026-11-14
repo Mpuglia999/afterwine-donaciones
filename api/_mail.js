@@ -1,5 +1,5 @@
-// Thank-you email for donors. Rendered here, sent by the Apps Script mailer at MAIL_WEBHOOK_URL
-// (runs as the Fundación's Google account, sender name "Fundación Desfibrilar").
+import { getGoogleToken } from "./_google.js";
+// Thank-you email for donors, sent from the code via Gmail API as "Fundación Desfibrilar" <donaciones@>.
 
 const NOMBRES = { afterwine: "After Wine 2026", pulsoweek: "Pulso Week 2027", latidos: "Latidos" };
 const LANDING = "https://afterwine.desfibrilar.org.ar/";
@@ -88,11 +88,47 @@ export function mailAgradecimiento(d) {
   return { to: d.email, subject, html, text };
 }
 
+// Sends via Gmail API as the Fundación (service account + domain-wide delegation, scope gmail.send).
+// MAIL_USER: Workspace mailbox that sends (default mpuglia@). MAIL_FROM: alias shown as sender.
+// Reusable from any project: import { enviarMail } and pass { to, subject, html, text }.
 export async function enviarMail(msg) {
-  const url = process.env.MAIL_WEBHOOK_URL;
-  if (!url || !msg.to) return false;
-  const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(msg), redirect: "follow" });
-  const t = await r.text();
-  if (!r.ok || !/"ok"\s*:\s*true/.test(t)) throw new Error(`Mailer ${r.status}: ${t.slice(0, 200)}`);
+  if (!msg || !msg.to) return false;
+  if (process.env.MAIL_DISABLED === "1") return false;
+  const user = process.env.MAIL_USER || "mpuglia@desfibrilar.org.ar";
+  const from = process.env.MAIL_FROM || "donaciones@desfibrilar.org.ar";
+  const fromName = msg.fromName || "Fundación Desfibrilar";
+  const token = await getGoogleToken("https://www.googleapis.com/auth/gmail.send", user);
+
+  const b64 = (s) => Buffer.from(s, "utf8").toString("base64");
+  const enc = (s) => `=?UTF-8?B?${b64(s)}?=`;
+  const boundary = "dsf_" + Date.now().toString(36);
+  const raw = [
+    `From: ${enc(fromName)} <${from}>`,
+    `To: ${msg.to}`,
+    `Reply-To: ${msg.replyTo || from}`,
+    `Subject: ${enc(msg.subject || "")}`,
+    "MIME-Version: 1.0",
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    "",
+    `--${boundary}`,
+    "Content-Type: text/plain; charset=UTF-8",
+    "Content-Transfer-Encoding: base64",
+    "",
+    b64(msg.text || "").replace(/.{76}/g, "$&\r\n"),
+    `--${boundary}`,
+    "Content-Type: text/html; charset=UTF-8",
+    "Content-Transfer-Encoding: base64",
+    "",
+    b64(msg.html || "").replace(/.{76}/g, "$&\r\n"),
+    `--${boundary}--`,
+    "",
+  ].join("\r\n");
+
+  const r = await fetch(`https://gmail.googleapis.com/gmail/v1/users/${encodeURIComponent(user)}/messages/send`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ raw: Buffer.from(raw, "utf8").toString("base64url") }),
+  });
+  if (!r.ok) throw new Error(`Gmail ${r.status}: ${(await r.text()).slice(0, 300)}`);
   return true;
 }

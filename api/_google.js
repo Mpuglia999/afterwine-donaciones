@@ -3,15 +3,17 @@ import crypto from "crypto";
 
 const tokenCache = {};
 
-export async function getGoogleToken(scope) {
-  const cached = tokenCache[scope];
+// subject: optional Workspace user to impersonate (domain-wide delegation, e.g. to send Gmail)
+export async function getGoogleToken(scope, subject) {
+  const cacheKey = scope + "|" + (subject || "");
+  const cached = tokenCache[cacheKey];
   if (cached && cached.exp > Date.now() + 60000) return cached.token;
 
   const email = process.env.GOOGLE_SA_EMAIL;
   const key = (process.env.GOOGLE_SA_KEY || "").replace(/\\n/g, "\n");
   const now = Math.floor(Date.now() / 1000);
   const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
-  const unsigned = b64({ alg: "RS256", typ: "JWT" }) + "." + b64({ iss: email, scope, aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3600 });
+  const unsigned = b64({ alg: "RS256", typ: "JWT" }) + "." + b64(Object.assign({ iss: email, scope, aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3600 }, subject ? { sub: subject } : {}));
   const signature = crypto.createSign("RSA-SHA256").update(unsigned).sign(key, "base64url");
 
   const resp = await fetch("https://oauth2.googleapis.com/token", {
@@ -21,7 +23,7 @@ export async function getGoogleToken(scope) {
   });
   if (!resp.ok) throw new Error("Google OAuth failed: " + (await resp.text()));
   const data = await resp.json();
-  tokenCache[scope] = { token: data.access_token, exp: Date.now() + data.expires_in * 1000 };
+  tokenCache[cacheKey] = { token: data.access_token, exp: Date.now() + data.expires_in * 1000 };
   return data.access_token;
 }
 
